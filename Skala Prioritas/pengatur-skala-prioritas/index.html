@@ -135,11 +135,16 @@
 
             <h2>Tugas Aktif</h2>
 
-            <button
-                class="btn btn-secondary"
-                id="sortDeadline">
-                Urutkan Deadline
-            </button>
+            <div class="sort-control">
+                <label for="sortSelect">Urutkan:</label>
+                <select id="sortSelect" class="sort-select">
+                    <option value="manual">Manual</option>
+                    <option value="deadline-asc">Deadline Terdekat</option>
+                    <option value="deadline-desc">Deadline Terjauh</option>
+                    <option value="weight-desc">Bobot Tertinggi</option>
+                    <option value="weight-asc">Bobot Terendah</option>
+                </select>
+            </div>
 
         </div>
 
