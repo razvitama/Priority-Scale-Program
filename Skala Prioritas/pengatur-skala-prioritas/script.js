@@ -4,6 +4,15 @@ let tasks = JSON.parse(
     localStorage.getItem(STORAGE_KEY)
 ) || [];
 
+// Menyimpan urutan manual secara terpisah dari hasil sorting.
+tasks.forEach((task, index) => {
+    if (typeof task.manualOrder !== "number") {
+        task.manualOrder = index;
+    }
+});
+
+let currentSort = "manual";
+
 
 // ================================
 // ELEMENT
@@ -30,7 +39,7 @@ const archivedTasks = document.getElementById("archivedTasks");
 const submitButton = document.getElementById("submitButton");
 const cancelEdit = document.getElementById("cancelEdit");
 
-const sortDeadline = document.getElementById("sortDeadline");
+const sortSelect = document.getElementById("sortSelect");
 
 
 // ================================
@@ -56,8 +65,33 @@ function renderTasks() {
     taskList.innerHTML = "";
     archiveList.innerHTML = "";
 
-    const active = tasks.filter(task => !task.archived);
+    let active = tasks.filter(task => !task.archived);
     const archived = tasks.filter(task => task.archived);
+
+    // Sorting hanya mengubah tampilan,
+    // bukan urutan manual yang tersimpan.
+    active.sort((a, b) => {
+
+        if (currentSort === "deadline-asc") {
+            return new Date(a.deadline) - new Date(b.deadline);
+        }
+
+        if (currentSort === "deadline-desc") {
+            return new Date(b.deadline) - new Date(a.deadline);
+        }
+
+        if (currentSort === "weight-desc") {
+            return Number(b.weight) - Number(a.weight);
+        }
+
+        if (currentSort === "weight-asc") {
+            return Number(a.weight) - Number(b.weight);
+        }
+
+        // Mode Manual
+        return Number(a.manualOrder) - Number(b.manualOrder);
+
+    });
 
 
     totalTasks.textContent = tasks.length;
@@ -276,12 +310,23 @@ taskForm.addEventListener("submit", function(event) {
 
     }
 
+
     // TAMBAH
     else {
 
         const newTask = {
 
             id: Date.now().toString(),
+
+            manualOrder:
+                tasks.reduce(
+                    (max, task) =>
+                        Math.max(
+                            max,
+                            Number(task.manualOrder) || 0
+                        ),
+                    -1
+                ) + 1,
 
             name: nameValue,
 
@@ -341,6 +386,7 @@ function editTask(id) {
 
     cancelEdit.classList.remove("hidden");
 
+
     document
         .getElementById("formTitle")
         .textContent = "Edit Tugas";
@@ -375,6 +421,7 @@ function resetForm() {
     submitButton.textContent = "Tambah Tugas";
 
     cancelEdit.classList.add("hidden");
+
 
     document
         .getElementById("formTitle")
@@ -470,7 +517,13 @@ function unarchiveTask(id) {
 function moveTask(id, direction) {
 
     const activeTasksArray =
-        tasks.filter(task => !task.archived);
+        tasks
+            .filter(task => !task.archived)
+            .sort(
+                (a, b) =>
+                    Number(a.manualOrder) -
+                    Number(b.manualOrder)
+            );
 
 
     const currentIndex =
@@ -499,28 +552,26 @@ function moveTask(id, direction) {
         activeTasksArray[newIndex];
 
 
-    const currentOriginalIndex =
-        tasks.findIndex(
-            task => task.id === currentTask.id
-        );
+    // Tukar posisi manual kedua tugas.
+    const tempOrder =
+        currentTask.manualOrder;
 
+    currentTask.manualOrder =
+        targetTask.manualOrder;
 
-    const targetOriginalIndex =
-        tasks.findIndex(
-            task => task.id === targetTask.id
-        );
-
-
-    [
-        tasks[currentOriginalIndex],
-        tasks[targetOriginalIndex]
-    ] = [
-        tasks[targetOriginalIndex],
-        tasks[currentOriginalIndex]
-    ];
+    targetTask.manualOrder =
+        tempOrder;
 
 
     saveTasks();
+
+
+    // Setelah tombol ↑/↓ digunakan,
+    // kembali ke mode Manual.
+    currentSort = "manual";
+
+    sortSelect.value = "manual";
+
 
     renderTasks();
 
@@ -528,34 +579,14 @@ function moveTask(id, direction) {
 
 
 // ================================
-// SORT DEADLINE
+// SORT TASKS
 // ================================
 
-sortDeadline.addEventListener(
-    "click",
+sortSelect.addEventListener(
+    "change",
     function() {
 
-        const activeTasks =
-            tasks.filter(task => !task.archived);
-
-        activeTasks.sort(
-            (a, b) =>
-                new Date(a.deadline) -
-                new Date(b.deadline)
-        );
-
-
-        const archived =
-            tasks.filter(task => task.archived);
-
-
-        tasks = [
-            ...activeTasks,
-            ...archived
-        ];
-
-
-        saveTasks();
+        currentSort = sortSelect.value;
 
         renderTasks();
 
