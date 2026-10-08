@@ -419,3 +419,19 @@ textarea:focus {
     }
 
 }
+
+
+/* OVERDUE WARNING */
+
+
+.overdue-warning {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 3px 7px;
+    border-radius: 6px;
+    background: #fee2e2;
+    color: #b91c1c;
+    font-size: 11px;
+    font-weight: bold;
+    vertical-align: middle;
+}
