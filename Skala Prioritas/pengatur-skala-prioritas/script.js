@@ -4,11 +4,14 @@ let tasks = JSON.parse(
     localStorage.getItem(STORAGE_KEY)
 ) || [];
 
-// Menyimpan urutan manual secara terpisah dari hasil sorting.
+// Menyimpan urutan manual secara terpisah
+// dari hasil sorting.
 tasks.forEach((task, index) => {
+
     if (typeof task.manualOrder !== "number") {
         task.manualOrder = index;
     }
+
 });
 
 let currentSort = "manual";
@@ -57,6 +60,87 @@ function saveTasks() {
 
 
 // ================================
+// CALCULATE PRIORITY
+// ================================
+
+function calculatePriority(task) {
+
+    const today = new Date();
+
+    today.setHours(0, 0, 0, 0);
+
+
+    const deadlineDate = new Date(
+        task.deadline + "T00:00:00"
+    );
+
+
+    // Selisih waktu dalam hari
+    const timeDifference =
+        deadlineDate.getTime() -
+        today.getTime();
+
+
+    const daysRemaining =
+        Math.ceil(
+            timeDifference /
+            (1000 * 60 * 60 * 24)
+        );
+
+
+    /*
+        Jika deadline sudah lewat,
+        berikan nilai urgensi maksimum.
+    */
+    let deadlineScore;
+
+
+    if (daysRemaining <= 0) {
+
+        deadlineScore = 100;
+
+    }
+    else {
+
+        /*
+            Semakin dekat deadline,
+            semakin tinggi nilainya.
+
+            30 hari atau lebih = 0
+            0 hari = 100
+        */
+
+        deadlineScore =
+            Math.max(
+                0,
+                100 - (daysRemaining / 30 * 100)
+            );
+
+    }
+
+
+    // Bobot sudah berada pada rentang 1-100.
+    const weightScore =
+        Number(task.weight);
+
+
+    /*
+        Prioritas akhir:
+
+        50% Bobot
+        50% Deadline
+    */
+    const priorityScore =
+        (weightScore * 0.5) +
+        (deadlineScore * 0.5);
+
+
+    return priorityScore;
+
+}
+
+
+// ================================
 // RENDER
 // ================================
 
@@ -65,63 +149,162 @@ function renderTasks() {
     taskList.innerHTML = "";
     archiveList.innerHTML = "";
 
-    let active = tasks.filter(task => !task.archived);
-    const archived = tasks.filter(task => task.archived);
 
-    // Sorting hanya mengubah tampilan,
-    // bukan urutan manual yang tersimpan.
+    let active =
+        tasks.filter(
+            task => !task.archived
+        );
+
+
+    const archived =
+        tasks.filter(
+            task => task.archived
+        );
+
+
+    // ================================
+    // SORT
+    // ================================
+
     active.sort((a, b) => {
 
+        // Manual
+        if (currentSort === "manual") {
+
+            return (
+                Number(a.manualOrder) -
+                Number(b.manualOrder)
+            );
+
+        }
+
+
+        // Deadline terdekat
         if (currentSort === "deadline-asc") {
-            return new Date(a.deadline) - new Date(b.deadline);
+
+            return (
+                new Date(a.deadline) -
+                new Date(b.deadline)
+            );
+
         }
 
+
+        // Deadline terjauh
         if (currentSort === "deadline-desc") {
-            return new Date(b.deadline) - new Date(a.deadline);
+
+            return (
+                new Date(b.deadline) -
+                new Date(a.deadline)
+            );
+
         }
 
+
+        // Bobot tertinggi
         if (currentSort === "weight-desc") {
-            return Number(b.weight) - Number(a.weight);
+
+            return (
+                Number(b.weight) -
+                Number(a.weight)
+            );
+
         }
 
+
+        // Bobot terendah
         if (currentSort === "weight-asc") {
-            return Number(a.weight) - Number(b.weight);
+
+            return (
+                Number(a.weight) -
+                Number(b.weight)
+            );
+
         }
 
-        // Mode Manual
-        return Number(a.manualOrder) - Number(b.manualOrder);
+
+        // Prioritas gabungan
+        if (currentSort === "priority") {
+
+            return (
+                calculatePriority(b) -
+                calculatePriority(a)
+            );
+
+        }
+
+
+        return 0;
 
     });
 
 
-    totalTasks.textContent = tasks.length;
-    activeTasks.textContent = active.length;
-    archivedTasks.textContent = archived.length;
+    // ================================
+    // STATISTICS
+    // ================================
 
+    totalTasks.textContent =
+        tasks.length;
+
+    activeTasks.textContent =
+        active.length;
+
+    archivedTasks.textContent =
+        archived.length;
+
+
+    // ================================
+    // EMPTY MESSAGE
+    // ================================
 
     emptyMessage.style.display =
-        active.length === 0 ? "block" : "none";
+        active.length === 0
+        ? "block"
+        : "none";
+
 
     emptyArchive.style.display =
-        archived.length === 0 ? "block" : "none";
+        archived.length === 0
+        ? "block"
+        : "none";
 
 
-    active.forEach((task, index) => {
+    // ================================
+    // ACTIVE TASKS
+    // ================================
 
-        taskList.appendChild(
-            createTaskCard(task, index, false)
-        );
+    active.forEach(
+        (task, index) => {
 
-    });
+            taskList.appendChild(
+                createTaskCard(
+                    task,
+                    index,
+                    false
+                )
+            );
+
+        }
+    );
 
 
-    archived.forEach((task) => {
+    // ================================
+    // ARCHIVED TASKS
+    // ================================
 
-        archiveList.appendChild(
-            createTaskCard(task, null, true)
-        );
+    archived.forEach(
+        task => {
 
-    });
+            archiveList.appendChild(
+                createTaskCard(
+                    task,
+                    null,
+                    true
+                )
+            );
+
+        }
+    );
 
 }
 
@@ -130,26 +313,71 @@ function renderTasks() {
 // CREATE TASK CARD
 // ================================
 
-function createTaskCard(task, index, isArchived) {
+function createTaskCard(
+    task,
+    index,
+    isArchived
+) {
 
-    const card = document.createElement("div");
+    const card =
+        document.createElement("div");
 
-    let priorityClass = "priority-low";
+
+    // ================================
+    // PRIORITY COLOR
+    // ================================
+
+    let priorityClass =
+        "priority-low";
+
 
     if (task.weight >= 70) {
-        priorityClass = "priority-high";
+
+        priorityClass =
+            "priority-high";
+
     }
     else if (task.weight >= 40) {
-        priorityClass = "priority-medium";
+
+        priorityClass =
+            "priority-medium";
+
     }
 
 
     card.className =
-        `task-card ${priorityClass} ${isArchived ? "archived" : ""}`;
+        `task-card ${priorityClass} ${
+            isArchived
+            ? "archived"
+            : ""
+        }`;
 
 
-    const overdue = isOverdue(task.deadline);
+    // ================================
+    // CHECK DEADLINE
+    // ================================
 
+    const overdue =
+        isOverdue(task.deadline);
+
+
+    // ================================
+    // OVERDUE WARNING
+    // ================================
+
+    const overdueWarning =
+        overdue && !isArchived
+        ? `
+            <span class="overdue-warning">
+                Melebihi Deadline
+            </span>
+        `
+        : "";
+
+
+    // ================================
+    // TASK CARD
+    // ================================
 
     card.innerHTML = `
 
@@ -158,15 +386,22 @@ function createTaskCard(task, index, isArchived) {
             <div>
 
                 <div class="task-title">
+
                     ${escapeHTML(task.name)}
+
+                    ${overdueWarning}
+
                 </div>
+
 
                 ${
                     task.description
                     ? `
-                    <div class="task-description">
-                        ${escapeHTML(task.description)}
-                    </div>
+                        <div class="task-description">
+                            ${escapeHTML(
+                                task.description
+                            )}
+                        </div>
                     `
                     : ""
                 }
@@ -177,19 +412,31 @@ function createTaskCard(task, index, isArchived) {
             ${
                 !isArchived
                 ? `
-                <div class="move-buttons">
+                    <div class="move-buttons">
 
-                    <button
-                        onclick="moveTask('${task.id}', -1)">
-                        ↑
-                    </button>
+                        <button
+                            onclick="
+                                moveTask(
+                                    '${task.id}',
+                                    -1
+                                )
+                            "
+                        >
+                            ↑
+                        </button>
 
-                    <button
-                        onclick="moveTask('${task.id}', 1)">
-                        ↓
-                    </button>
+                        <button
+                            onclick="
+                                moveTask(
+                                    '${task.id}',
+                                    1
+                                )
+                            "
+                        >
+                            ↓
+                        </button>
 
-                </div>
+                    </div>
                 `
                 : ""
             }
@@ -204,11 +451,14 @@ function createTaskCard(task, index, isArchived) {
             </span>
 
 
-            <span class="badge ${
-                overdue
-                ? "badge-overdue"
-                : "badge-deadline"
-            }">
+            <span class="
+                badge
+                ${
+                    overdue
+                    ? "badge-overdue"
+                    : "badge-deadline"
+                }
+            ">
 
                 Deadline:
                 ${formatDate(task.deadline)}
@@ -236,20 +486,36 @@ function createTaskCard(task, index, isArchived) {
                 ? `
                     <button
                         class="btn btn-secondary"
-                        onclick="editTask('${task.id}')">
+                        onclick="
+                            editTask(
+                                '${task.id}'
+                            )
+                        "
+                    >
                         Edit
                     </button>
 
+
                     <button
                         class="btn btn-archive"
-                        onclick="archiveTask('${task.id}')">
+                        onclick="
+                            archiveTask(
+                                '${task.id}'
+                            )
+                        "
+                    >
                         Arsipkan
                     </button>
                 `
                 : `
                     <button
                         class="btn btn-success"
-                        onclick="unarchiveTask('${task.id}')">
+                        onclick="
+                            unarchiveTask(
+                                '${task.id}'
+                            )
+                        "
+                    >
                         Kembalikan
                     </button>
                 `
@@ -258,7 +524,12 @@ function createTaskCard(task, index, isArchived) {
 
             <button
                 class="btn btn-danger"
-                onclick="deleteTask('${task.id}')">
+                onclick="
+                    deleteTask(
+                        '${task.id}'
+                    )
+                "
+            >
                 Hapus
             </button>
 
@@ -268,6 +539,7 @@ function createTaskCard(task, index, isArchived) {
 
 
     return card;
+
 }
 
 
@@ -275,84 +547,140 @@ function createTaskCard(task, index, isArchived) {
 // ADD / EDIT TASK
 // ================================
 
-taskForm.addEventListener("submit", function(event) {
+taskForm.addEventListener(
+    "submit",
+    function(event) {
 
-    event.preventDefault();
-
-
-    const nameValue = taskName.value.trim();
-    const deadlineValue = deadline.value;
-    const weightValue = Number(weight.value);
-    const descriptionValue = description.value.trim();
+        event.preventDefault();
 
 
-    if (!nameValue || !deadlineValue) {
-        return;
-    }
+        const nameValue =
+            taskName.value.trim();
 
 
-    // EDIT
-    if (taskId.value) {
-
-        const task = tasks.find(
-            item => item.id === taskId.value
-        );
+        const deadlineValue =
+            deadline.value;
 
 
-        if (task) {
+        const weightValue =
+            Number(weight.value);
 
-            task.name = nameValue;
-            task.deadline = deadlineValue;
-            task.weight = weightValue;
-            task.description = descriptionValue;
+
+        const descriptionValue =
+            description.value.trim();
+
+
+        if (
+            !nameValue ||
+            !deadlineValue
+        ) {
+
+            return;
 
         }
 
-    }
+
+        // ================================
+        // EDIT
+        // ================================
+
+        if (taskId.value) {
+
+            const task =
+                tasks.find(
+                    item =>
+                        item.id ===
+                        taskId.value
+                );
 
 
-    // TAMBAH
-    else {
+            if (task) {
 
-        const newTask = {
+                task.name =
+                    nameValue;
 
-            id: Date.now().toString(),
+                task.deadline =
+                    deadlineValue;
 
-            manualOrder:
-                tasks.reduce(
-                    (max, task) =>
-                        Math.max(
+                task.weight =
+                    weightValue;
+
+                task.description =
+                    descriptionValue;
+
+            }
+
+        }
+
+
+        // ================================
+        // TAMBAH
+        // ================================
+
+        else {
+
+            const newTask = {
+
+                id:
+                    Date.now().toString(),
+
+
+                manualOrder:
+                    tasks.reduce(
+                        (
                             max,
-                            Number(task.manualOrder) || 0
-                        ),
-                    -1
-                ) + 1,
+                            task
+                        ) => {
 
-            name: nameValue,
+                            return Math.max(
+                                max,
+                                Number(
+                                    task.manualOrder
+                                ) || 0
+                            );
 
-            deadline: deadlineValue,
-
-            weight: weightValue,
-
-            description: descriptionValue,
-
-            archived: false
-
-        };
+                        },
+                        -1
+                    ) + 1,
 
 
-        tasks.push(newTask);
+                name:
+                    nameValue,
+
+
+                deadline:
+                    deadlineValue,
+
+
+                weight:
+                    weightValue,
+
+
+                description:
+                    descriptionValue,
+
+
+                archived:
+                    false
+
+            };
+
+
+            tasks.push(
+                newTask
+            );
+
+        }
+
+
+        saveTasks();
+
+        renderTasks();
+
+        resetForm();
 
     }
-
-
-    saveTasks();
-
-    renderTasks();
-
-    resetForm();
-
-});
+);
 
 
 // ================================
@@ -361,40 +689,60 @@ taskForm.addEventListener("submit", function(event) {
 
 function editTask(id) {
 
-    const task = tasks.find(
-        item => item.id === id
-    );
+    const task =
+        tasks.find(
+            item => item.id === id
+        );
 
 
     if (!task) {
+
         return;
+
     }
 
 
-    taskId.value = task.id;
-
-    taskName.value = task.name;
-
-    deadline.value = task.deadline;
-
-    weight.value = task.weight;
-
-    description.value = task.description;
+    taskId.value =
+        task.id;
 
 
-    submitButton.textContent = "Simpan Perubahan";
+    taskName.value =
+        task.name;
 
-    cancelEdit.classList.remove("hidden");
+
+    deadline.value =
+        task.deadline;
+
+
+    weight.value =
+        task.weight;
+
+
+    description.value =
+        task.description;
+
+
+    submitButton.textContent =
+        "Simpan Perubahan";
+
+
+    cancelEdit.classList.remove(
+        "hidden"
+    );
 
 
     document
         .getElementById("formTitle")
-        .textContent = "Edit Tugas";
+        .textContent =
+        "Edit Tugas";
 
 
     window.scrollTo({
+
         top: 0,
+
         behavior: "smooth"
+
     });
 
 }
@@ -414,18 +762,28 @@ function resetForm() {
 
     taskForm.reset();
 
-    taskId.value = "";
 
-    weight.value = 50;
+    taskId.value =
+        "";
 
-    submitButton.textContent = "Tambah Tugas";
 
-    cancelEdit.classList.add("hidden");
+    weight.value =
+        50;
+
+
+    submitButton.textContent =
+        "Tambah Tugas";
+
+
+    cancelEdit.classList.add(
+        "hidden"
+    );
 
 
     document
         .getElementById("formTitle")
-        .textContent = "Tambah Tugas";
+        .textContent =
+        "Tambah Tugas";
 
 }
 
@@ -436,19 +794,24 @@ function resetForm() {
 
 function deleteTask(id) {
 
-    const confirmed = confirm(
-        "Apakah Anda yakin ingin menghapus tugas ini?"
-    );
+    const confirmed =
+        confirm(
+            "Apakah Anda yakin ingin menghapus tugas ini?"
+        );
 
 
     if (!confirmed) {
+
         return;
+
     }
 
 
-    tasks = tasks.filter(
-        task => task.id !== id
-    );
+    tasks =
+        tasks.filter(
+            task =>
+                task.id !== id
+        );
 
 
     saveTasks();
@@ -464,17 +827,21 @@ function deleteTask(id) {
 
 function archiveTask(id) {
 
-    const task = tasks.find(
-        item => item.id === id
-    );
+    const task =
+        tasks.find(
+            item => item.id === id
+        );
 
 
     if (!task) {
+
         return;
+
     }
 
 
-    task.archived = true;
+    task.archived =
+        true;
 
 
     saveTasks();
@@ -490,17 +857,21 @@ function archiveTask(id) {
 
 function unarchiveTask(id) {
 
-    const task = tasks.find(
-        item => item.id === id
-    );
+    const task =
+        tasks.find(
+            item => item.id === id
+        );
 
 
     if (!task) {
+
         return;
+
     }
 
 
-    task.archived = false;
+    task.archived =
+        false;
 
 
     saveTasks();
@@ -514,50 +885,72 @@ function unarchiveTask(id) {
 // MOVE TASK
 // ================================
 
-function moveTask(id, direction) {
+function moveTask(
+    id,
+    direction
+) {
 
     const activeTasksArray =
         tasks
-            .filter(task => !task.archived)
+            .filter(
+                task =>
+                    !task.archived
+            )
             .sort(
                 (a, b) =>
-                    Number(a.manualOrder) -
-                    Number(b.manualOrder)
+                    Number(
+                        a.manualOrder
+                    ) -
+                    Number(
+                        b.manualOrder
+                    )
             );
 
 
     const currentIndex =
         activeTasksArray.findIndex(
-            task => task.id === id
+            task =>
+                task.id === id
         );
 
 
     const newIndex =
-        currentIndex + direction;
+        currentIndex +
+        direction;
 
 
     if (
         currentIndex < 0 ||
         newIndex < 0 ||
-        newIndex >= activeTasksArray.length
+        newIndex >=
+            activeTasksArray.length
     ) {
+
         return;
+
     }
 
 
     const currentTask =
-        activeTasksArray[currentIndex];
+        activeTasksArray[
+            currentIndex
+        ];
+
 
     const targetTask =
-        activeTasksArray[newIndex];
+        activeTasksArray[
+            newIndex
+        ];
 
 
-    // Tukar posisi manual kedua tugas.
+    // Tukar posisi manual
     const tempOrder =
         currentTask.manualOrder;
 
+
     currentTask.manualOrder =
         targetTask.manualOrder;
+
 
     targetTask.manualOrder =
         tempOrder;
@@ -566,11 +959,13 @@ function moveTask(id, direction) {
     saveTasks();
 
 
-    // Setelah tombol ↑/↓ digunakan,
-    // kembali ke mode Manual.
-    currentSort = "manual";
+    // Kembali ke mode manual
+    currentSort =
+        "manual";
 
-    sortSelect.value = "manual";
+
+    sortSelect.value =
+        "manual";
 
 
     renderTasks();
@@ -579,14 +974,16 @@ function moveTask(id, direction) {
 
 
 // ================================
-// SORT TASKS
+// SORT
 // ================================
 
 sortSelect.addEventListener(
     "change",
     function() {
 
-        currentSort = sortSelect.value;
+        currentSort =
+            sortSelect.value;
+
 
         renderTasks();
 
@@ -598,37 +995,64 @@ sortSelect.addEventListener(
 // DATE
 // ================================
 
-function formatDate(dateString) {
+function formatDate(
+    dateString
+) {
 
-    const date = new Date(
-        dateString + "T00:00:00"
-    );
+    const date =
+        new Date(
+            dateString +
+            "T00:00:00"
+        );
 
 
     return date.toLocaleDateString(
         "id-ID",
         {
+
             day: "2-digit",
+
             month: "short",
+
             year: "numeric"
+
         }
     );
 
 }
 
 
-function isOverdue(dateString) {
+// ================================
+// CHECK OVERDUE
+// ================================
 
-    const today = new Date();
+function isOverdue(
+    dateString
+) {
 
-    today.setHours(0, 0, 0, 0);
+    const today =
+        new Date();
+
+
+    today.setHours(
+        0,
+        0,
+        0,
+        0
+    );
 
 
     const deadlineDate =
-        new Date(dateString + "T00:00:00");
+        new Date(
+            dateString +
+            "T00:00:00"
+        );
 
 
-    return deadlineDate < today;
+    return (
+        deadlineDate <
+        today
+    );
 
 }
 
@@ -637,11 +1061,19 @@ function isOverdue(dateString) {
 // SECURITY
 // ================================
 
-function escapeHTML(text) {
+function escapeHTML(
+    text
+) {
 
-    const div = document.createElement("div");
+    const div =
+        document.createElement(
+            "div"
+        );
 
-    div.textContent = text;
+
+    div.textContent =
+        text;
+
 
     return div.innerHTML;
 
