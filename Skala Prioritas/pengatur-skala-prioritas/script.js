@@ -4,8 +4,8 @@
 // ============================================
 
 // Ganti dengan URL dan publishable/anon key Supabase.
-const SUPABASE_URL = "MASUKKAN_URL_PROJECT_SUPABASE";
-const SUPABASE_ANON_KEY = "MASUKKAN_PUBLISHABLE_ATAU_ANON_KEY_SUPABASE";
+const SUPABASE_URL = https://yuxgbmpzekxiccrqgbut.supabase.co;
+const SUPABASE_ANON_KEY = sb_publishable_-oT3Vbkt41nBu5C5t2bHjg_Pso62yUs;
 
 const STORAGE_KEY = "skalaPrioritasTasks";
 
