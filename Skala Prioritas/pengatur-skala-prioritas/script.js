@@ -1,87 +1,28 @@
 
-// ============================================
-// SKALA PRIORITAS TUGAS + SUPABASE GOOGLE LOGIN
-// ============================================
+/* =========================================
+   KONFIGURASI SUPABASE
+========================================= */
 
-// Ganti dengan URL dan publishable/anon key Supabase.
-const SUPABASE_URL = "https://yuxgbmpzekxiccrqgbut.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_-oT3Vbkt41nBu5C5t2bHjg_Pso62yUs";
+const SUPABASE_URL =
+    "https://yuxgbmpzekxiccrqgbut.supabase.co";
 
-const STORAGE_KEY = "skalaPrioritasTasks";
+const SUPABASE_ANON_KEY =
+    "sb_publishable_-oT3Vbkt41nBu5C5t2bHjg_Pso62yUs";
 
-const hasSupabaseConfig =
-    typeof SUPABASE_URL === "string" &&
-    SUPABASE_URL.startsWith("https://") &&
-    SUPABASE_ANON_KEY !==
-        "MASUKKAN_PUBLISHABLE_ATAU_ANON_KEY_SUPABASE" &&
-    SUPABASE_ANON_KEY.trim().length > 0;
+const supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+);
 
-if (!window.supabase || !hasSupabaseConfig) {
-    console.error(
-        "Konfigurasi Supabase belum lengkap. Isi SUPABASE_URL dan SUPABASE_ANON_KEY."
-    );
-}
 
-const supabaseClient =
-    window.supabase && hasSupabaseConfig
-        ? window.supabase.createClient(
-            SUPABASE_URL,
-            SUPABASE_ANON_KEY
-        )
-        : null;
+/* =========================================
+   VARIABEL APLIKASI
+========================================= */
 
-// Membaca tugas yang sudah tersimpan di browser.
-function readLocalTasks() {
-    try {
-        const saved = JSON.parse(
-            localStorage.getItem(STORAGE_KEY) || "[]"
-        );
-
-        if (!Array.isArray(saved)) return [];
-
-        saved.forEach((task, index) => {
-            if (typeof task.manualOrder !== "number") {
-                task.manualOrder = index;
-            }
-
-            if (typeof task.archived !== "boolean") {
-                task.archived = false;
-            }
-
-            if (task.id !== undefined && task.id !== null) {
-                task.id = String(task.id);
-            }
-        });
-
-        return saved;
-    } catch (error) {
-        console.error(
-            "Gagal membaca tugas dari localStorage:",
-            error
-        );
-
-        return [];
-    }
-}
-
-let tasks = readLocalTasks();
+let tasks = [];
+let currentUser = null;
 let currentSort = "manual";
-let currentUserId = null;
-let cloudReady = false;
-let authStateUserId = null;
-let syncQueue = Promise.resolve();
-
-// ============================================
-// ELEMENT HTML
-// ============================================
-
-const loginSection = document.getElementById("loginSection");
-const appContent = document.getElementById("appContent");
-const googleLoginButton =
-    document.getElementById("googleLoginButton");
-const logoutButton = document.getElementById("logoutButton");
-const userEmail = document.getElementById("userEmail");
-const authStatus = document.getElementById("authStatus");
+let isSaving = false;
 
 const taskForm = document.getElementById("taskForm");
 const taskId = document.getElementById("taskId");
@@ -92,6 +33,7 @@ const description = document.getElementById("description");
 
 const taskList = document.getElementById("taskList");
 const archiveList = document.getElementById("archiveList");
+
 const emptyMessage = document.getElementById("emptyMessage");
 const emptyArchive = document.getElementById("emptyArchive");
 
@@ -102,294 +44,202 @@ const archivedTasks = document.getElementById("archivedTasks");
 const submitButton = document.getElementById("submitButton");
 const cancelEdit = document.getElementById("cancelEdit");
 const sortSelect = document.getElementById("sortSelect");
+const formTitle = document.getElementById("formTitle");
 
-// ============================================
-// STATUS LOGIN / CLOUD
-// ============================================
+const loginSection = document.getElementById("loginSection");
+const appContent = document.getElementById("appContent");
+const googleLoginButton = document.getElementById("googleLoginButton");
+const logoutButton = document.getElementById("logoutButton");
+const authStatus = document.getElementById("authStatus");
+const userEmail = document.getElementById("userEmail");
 
-function setAuthStatus(message, isError = false) {
-    if (!authStatus) return;
 
-    authStatus.textContent = message;
-    authStatus.style.color = isError ? "#b42318" : "inherit";
-}
+/* =========================================
+   LOGIN GOOGLE
+========================================= */
 
-function showLoggedOut() {
-    currentUserId = null;
-    cloudReady = false;
-    tasks = readLocalTasks();
+googleLoginButton.addEventListener("click", async () => {
+    try {
+        googleLoginButton.disabled = true;
+        authStatus.textContent = "Menghubungkan ke Google...";
 
-    if (loginSection) loginSection.hidden = false;
-    if (appContent) appContent.hidden = true;
-    if (logoutButton) logoutButton.hidden = true;
-    if (googleLoginButton) googleLoginButton.disabled = false;
-    if (userEmail) userEmail.textContent = "";
+        const { error } =
+            await supabaseClient.auth.signInWithOAuth({
+                provider: "google",
+                options: {
+                    redirectTo: window.location.origin
+                }
+            });
 
-    setAuthStatus(
-        supabaseClient
-            ? "Masuk dengan Google untuk menyimpan tugas di cloud."
-            : "Isi URL dan key Supabase di bagian atas script.js terlebih dahulu.",
-        !supabaseClient
-    );
-}
+        if (error) {
+            throw error;
+        }
+    } catch (error) {
+        console.error("Login Google gagal:", error);
 
-async function handleAuthSession(session) {
-    const user = session?.user;
+        authStatus.textContent =
+            "Login gagal: " + error.message;
 
-    if (!user) {
-        authStateUserId = null;
-        showLoggedOut();
+        googleLoginButton.disabled = false;
+    }
+});
+
+
+/* =========================================
+   LOGOUT
+========================================= */
+
+logoutButton.addEventListener("click", async () => {
+    try {
+        logoutButton.disabled = true;
+
+        const { error } =
+            await supabaseClient.auth.signOut();
+
+        if (error) {
+            throw error;
+        }
+    } catch (error) {
+        console.error("Logout gagal:", error);
+        alert("Gagal keluar: " + error.message);
+    } finally {
+        logoutButton.disabled = false;
+    }
+});
+
+
+/* =========================================
+   STATUS AUTENTIKASI
+========================================= */
+
+let authRequestNumber = 0;
+
+async function handleSession(session) {
+    const requestNumber = ++authRequestNumber;
+
+    currentUser = session?.user ?? null;
+
+    if (!currentUser) {
+        tasks = [];
+
+        loginSection.hidden = false;
+        appContent.hidden = true;
+        logoutButton.hidden = true;
+        userEmail.textContent = "";
+
+        authStatus.textContent =
+            "Silakan login menggunakan akun Google.";
+
+        googleLoginButton.disabled = false;
+        renderTasks();
+
         return;
     }
 
-    // Hindari memuat ulang sesi yang sama.
-    if (authStateUserId === user.id && cloudReady) return;
-
-    authStateUserId = user.id;
-    currentUserId = user.id;
-    cloudReady = false;
-
-    if (loginSection) loginSection.hidden = true;
-    if (appContent) appContent.hidden = false;
-    if (logoutButton) logoutButton.hidden = false;
-
-    if (userEmail) {
-        userEmail.textContent = user.email || "Login berhasil";
-    }
-
-    setAuthStatus("Mengambil data tugas...");
+    loginSection.hidden = true;
+    appContent.hidden = false;
+    logoutButton.hidden = false;
+    userEmail.textContent =
+        currentUser.email || "Pengguna login";
 
     try {
-        const { data: cloudRows, error } = await supabaseClient
-            .from("tasks")
-            .select(
-                "id, name, deadline, weight, description, archived, position"
-            )
-            .eq("user_id", currentUserId)
-            .order("position", { ascending: true });
+        await loadTasks();
 
-        if (error) throw error;
-
-        if (cloudRows && cloudRows.length > 0) {
-            // Data cloud menjadi sumber utama untuk ID yang sudah ada.
-            tasks = cloudRows.map((row, index) => ({
-                id: String(row.id),
-                name: row.name || "",
-                deadline: row.deadline || "",
-                weight: Number(row.weight ?? 50),
-                description: row.description || "",
-                archived: Boolean(row.archived),
-                manualOrder: Number(row.position ?? index)
-            }));
-
-            // Pertahankan tugas lokal yang belum ada di cloud.
-            const cloudIds = new Set(
-                tasks.map(task => String(task.id))
-            );
-
-            const localOnlyTasks = readLocalTasks().filter(
-                task => !cloudIds.has(String(task.id))
-            );
-
-            if (localOnlyTasks.length > 0) {
-                let nextOrder = tasks.reduce(
-                    (max, task) =>
-                        Math.max(
-                            max,
-                            Number(task.manualOrder) || 0
-                        ),
-                    -1
-                ) + 1;
-
-                localOnlyTasks.forEach(task => {
-                    task.manualOrder = nextOrder++;
-                    tasks.push(task);
-                });
-
-                await writeTasksToCloud();
-            }
-
-            localStorage.setItem(
-                STORAGE_KEY,
-                JSON.stringify(tasks)
-            );
-        } else {
-            // Cloud kosong: migrasikan tugas lama dari browser.
-            tasks = readLocalTasks();
-
-            if (tasks.length > 0) {
-                await writeTasksToCloud();
-            }
+        // Abaikan hasil lama jika sesi berubah saat data dimuat.
+        if (requestNumber !== authRequestNumber) {
+            return;
         }
 
-        cloudReady = true;
         renderTasks();
-        setAuthStatus("Tersinkron dengan Supabase.");
     } catch (error) {
-        console.error(
-            "Gagal memuat atau menyinkronkan tugas:",
-            error
+        console.error("Gagal memuat tugas:", error);
+
+        authStatus.textContent =
+            "Gagal memuat tugas. Periksa koneksi dan pengaturan Supabase.";
+
+        alert(
+            "Data tugas gagal dimuat: " + error.message
         );
-
-        cloudReady = false;
-
-        setAuthStatus(
-            "Gagal mengakses cloud. Periksa tabel Supabase dan RLS.",
-            true
-        );
-
-        // Tugas lokal tetap dipertahankan jika cloud gagal.
-        tasks = readLocalTasks();
-        renderTasks();
     }
 }
 
-// ============================================
-// INISIALISASI LOGIN
-// ============================================
 
-if (supabaseClient) {
-    supabaseClient.auth.onAuthStateChange(
-        (_event, session) => {
-            // Jalankan setelah callback autentikasi selesai.
-            setTimeout(() => {
-                handleAuthSession(session);
-            }, 0);
-        }
-    );
+/* =========================================
+   MEMUAT TUGAS DARI SUPABASE
+========================================= */
 
-    supabaseClient.auth.getSession().then(
-        ({ data, error }) => {
-            if (error) {
-                console.error(
-                    "Gagal memeriksa sesi:",
-                    error
-                );
-
-                setAuthStatus(
-                    "Gagal memeriksa sesi login.",
-                    true
-                );
-
-                return;
-            }
-
-            handleAuthSession(data.session);
-        }
-    );
-} else {
-    setAuthStatus(
-        "Isi URL dan key Supabase di bagian atas script.js terlebih dahulu.",
-        true
-    );
-}
-
-// Login dengan Google.
-if (googleLoginButton) {
-    googleLoginButton.addEventListener(
-        "click",
-        async () => {
-            if (!supabaseClient) {
-                setAuthStatus(
-                    "Isi konfigurasi Supabase terlebih dahulu.",
-                    true
-                );
-
-                return;
-            }
-
-            googleLoginButton.disabled = true;
-            setAuthStatus("Mengalihkan ke Google...");
-
-            const { error } =
-                await supabaseClient.auth.signInWithOAuth({
-                    provider: "google",
-                    options: {
-                        redirectTo: window.location.origin
-                    }
-                });
-
-            if (error) {
-                console.error(
-                    "Google login gagal:",
-                    error
-                );
-
-                setAuthStatus(
-                    "Login Google gagal: " + error.message,
-                    true
-                );
-
-                googleLoginButton.disabled = false;
-            }
-        }
-    );
-}
-
-// Logout.
-if (logoutButton) {
-    logoutButton.addEventListener(
-        "click",
-        async () => {
-            if (!supabaseClient) return;
-
-            const { error } =
-                await supabaseClient.auth.signOut();
-
-            if (error) {
-                console.error(
-                    "Logout gagal:",
-                    error
-                );
-
-                setAuthStatus(
-                    "Logout gagal: " + error.message,
-                    true
-                );
-            }
-        }
-    );
-}
-
-
-// ============================================
-// LOCAL STORAGE + SUPABASE SYNC
-// ============================================
-
-function saveTasks() {
-    // Simpan salinan lokal.
-    localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(tasks)
-    );
-
-    if (!cloudReady || !currentUserId || !supabaseClient) {
+async function loadTasks() {
+    if (!currentUser) {
+        tasks = [];
         return;
     }
 
-    // Jaga urutan operasi sinkronisasi.
-    syncQueue = syncQueue
-        .then(() => writeTasksToCloud())
-        .catch(error => {
-            console.error(
-                "Sinkronisasi tugas gagal:",
-                error
-            );
+    const { data, error } = await supabaseClient
+        .from("tasks")
+        .select("*")
+        .eq("user_id", currentUser.id)
+        .order("position", { ascending: true });
 
-            setAuthStatus(
-                "Perubahan tersimpan di browser, tetapi sinkronisasi cloud gagal.",
-                true
-            );
-        });
+    if (error) {
+        throw error;
+    }
+
+    tasks = (data || []).map((row, index) => ({
+        id: row.id,
+        name: row.name,
+        deadline: row.deadline,
+        weight: Number(row.weight),
+        description: row.description || "",
+        archived: Boolean(row.archived),
+        manualOrder: Number(row.position ?? index),
+        created_at: row.created_at
+    }));
 }
 
-async function writeTasksToCloud() {
-    if (!currentUserId || !supabaseClient) return;
 
-    const userIdForWrite = currentUserId;
+/* =========================================
+   MENYIMPAN SATU TUGAS KE SUPABASE
+========================================= */
 
-    const snapshot = tasks.map((task, index) => ({
-        user_id: userIdForWrite,
+async function saveTaskToCloud(task) {
+    if (!currentUser) {
+        throw new Error("Silakan login terlebih dahulu.");
+    }
+
+    const row = {
+        user_id: currentUser.id,
+        id: String(task.id),
+        name: task.name,
+        deadline: task.deadline,
+        weight: Number(task.weight),
+        description: task.description || "",
+        archived: Boolean(task.archived),
+        position: Number(task.manualOrder ?? 0)
+    };
+
+    const { error } = await supabaseClient
+        .from("tasks")
+        .upsert(row, {
+            onConflict: "user_id,id"
+        });
+
+    if (error) {
+        throw error;
+    }
+}
+
+
+/* =========================================
+   MENYIMPAN URUTAN SEMUA TUGAS
+========================================= */
+
+async function saveAllPositions() {
+    if (!currentUser) {
+        throw new Error("Silakan login terlebih dahulu.");
+    }
+
+    const rows = tasks.map((task, index) => ({
+        user_id: currentUser.id,
         id: String(task.id),
         name: task.name,
         deadline: task.deadline,
@@ -399,53 +249,47 @@ async function writeTasksToCloud() {
         position: Number(task.manualOrder ?? index)
     }));
 
-    // Simpan atau perbarui tugas.
-    if (snapshot.length > 0) {
-        const { error: upsertError } =
-            await supabaseClient
-                .from("tasks")
-                .upsert(snapshot, {
-                    onConflict: "user_id,id"
-                });
-
-        if (upsertError) throw upsertError;
+    if (rows.length === 0) {
+        return;
     }
 
-    // Ambil ID tugas yang masih ada di cloud.
-    const { data: cloudRows, error: fetchError } =
-        await supabaseClient
-            .from("tasks")
-            .select("id")
-            .eq("user_id", userIdForWrite);
+    const { error } = await supabaseClient
+        .from("tasks")
+        .upsert(rows, {
+            onConflict: "user_id,id"
+        });
 
-    if (fetchError) throw fetchError;
-
-    // Cari tugas cloud yang sudah dihapus dari daftar lokal.
-    const currentIds = new Set(
-        snapshot.map(task => task.id)
-    );
-
-    const staleIds = (cloudRows || [])
-        .map(row => String(row.id))
-        .filter(id => !currentIds.has(id));
-
-    if (staleIds.length > 0) {
-        const { error: deleteError } =
-            await supabaseClient
-                .from("tasks")
-                .delete()
-                .eq("user_id", userIdForWrite)
-                .in("id", staleIds);
-
-        if (deleteError) throw deleteError;
+    if (error) {
+        throw error;
     }
-
-    setAuthStatus("Tersinkron dengan Supabase.");
 }
 
-// ============================================
-// CALCULATE PRIORITY
-// ============================================
+
+/* =========================================
+   MENGHAPUS TUGAS DARI SUPABASE
+========================================= */
+
+async function deleteTaskFromCloud(id) {
+    if (!currentUser) {
+        throw new Error("Silakan login terlebih dahulu.");
+    }
+
+    const { error } = await supabaseClient
+        .from("tasks")
+        .delete()
+        .eq("user_id", currentUser.id)
+        .eq("id", String(id));
+
+    if (error) {
+        throw error;
+    }
+}
+
+
+/* =========================================
+   HITUNG PRIORITAS GABUNGAN
+   50% bobot + 50% urgensi deadline
+========================================= */
 
 function calculatePriority(task) {
     const today = new Date();
@@ -455,11 +299,9 @@ function calculatePriority(task) {
         task.deadline + "T00:00:00"
     );
 
-    const timeDifference =
-        deadlineDate.getTime() - today.getTime();
-
     const daysRemaining = Math.ceil(
-        timeDifference / (1000 * 60 * 60 * 24)
+        (deadlineDate.getTime() - today.getTime()) /
+        (1000 * 60 * 60 * 24)
     );
 
     let deadlineScore;
@@ -475,98 +317,108 @@ function calculatePriority(task) {
 
     const weightScore = Number(task.weight);
 
-    // 50% bobot dan 50% deadline.
     return (
-        (weightScore * 0.5) +
-        (deadlineScore * 0.5)
+        weightScore * 0.5 +
+        deadlineScore * 0.5
     );
 }
 
-// ============================================
-// RENDER TASKS
-// ============================================
+
+/* =========================================
+   MEMERIKSA DEADLINE
+========================================= */
+
+function isOverdue(dateString) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const deadlineDate = new Date(
+        dateString + "T00:00:00"
+    );
+
+    return deadlineDate < today;
+}
+
+
+function formatDate(dateString) {
+    const date = new Date(
+        dateString + "T00:00:00"
+    );
+
+    return date.toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
+    });
+}
+
+
+/* =========================================
+   KEAMANAN TEKS HTML
+========================================= */
+
+function escapeHTML(value) {
+    const element = document.createElement("div");
+    element.textContent = String(value ?? "");
+    return element.innerHTML;
+}
+
+
+/* =========================================
+   MENAMPILKAN TUGAS
+========================================= */
 
 function renderTasks() {
-    if (!taskList || !archiveList) return;
-
     taskList.innerHTML = "";
     archiveList.innerHTML = "";
 
-    const active = tasks.filter(
-        task => !task.archived
-    );
+    const active = tasks
+        .filter(task => !task.archived)
+        .slice();
 
-    const archived = tasks.filter(
-        task => task.archived
-    );
+    const archived = tasks
+        .filter(task => task.archived)
+        .slice();
 
-    // Pengurutan tugas aktif.
     active.sort((a, b) => {
-        if (currentSort === "manual") {
-            return (
-                Number(a.manualOrder) -
-                Number(b.manualOrder)
-            );
-        }
+        switch (currentSort) {
+            case "deadline-asc":
+                return a.deadline.localeCompare(b.deadline);
 
-        if (currentSort === "deadline-asc") {
-            return (
-                new Date(a.deadline) -
-                new Date(b.deadline)
-            );
-        }
+            case "deadline-desc":
+                return b.deadline.localeCompare(a.deadline);
 
-        if (currentSort === "deadline-desc") {
-            return (
-                new Date(b.deadline) -
-                new Date(a.deadline)
-            );
-        }
+            case "weight-desc":
+                return Number(b.weight) - Number(a.weight);
 
-        if (currentSort === "weight-desc") {
-            return (
-                Number(b.weight) -
-                Number(a.weight)
-            );
-        }
+            case "weight-asc":
+                return Number(a.weight) - Number(b.weight);
 
-        if (currentSort === "weight-asc") {
-            return (
-                Number(a.weight) -
-                Number(b.weight)
-            );
-        }
+            case "priority":
+                return calculatePriority(b) - calculatePriority(a);
 
-        if (currentSort === "priority") {
-            return (
-                calculatePriority(b) -
-                calculatePriority(a)
-            );
+            case "manual":
+            default:
+                return Number(a.manualOrder) - Number(b.manualOrder);
         }
-
-        return 0;
     });
 
-    // Statistik.
     totalTasks.textContent = tasks.length;
     activeTasks.textContent = active.length;
     archivedTasks.textContent = archived.length;
 
-    // Pesan saat daftar kosong.
     emptyMessage.style.display =
         active.length === 0 ? "block" : "none";
 
     emptyArchive.style.display =
         archived.length === 0 ? "block" : "none";
 
-    // Tugas aktif.
     active.forEach((task, index) => {
         taskList.appendChild(
             createTaskCard(task, index, false)
         );
     });
 
-    // Tugas arsip.
     archived.forEach(task => {
         archiveList.appendChild(
             createTaskCard(task, null, true)
@@ -574,14 +426,14 @@ function renderTasks() {
     });
 }
 
-// ============================================
-// CREATE TASK CARD
-// ============================================
+
+/* =========================================
+   MEMBUAT KARTU TUGAS
+========================================= */
 
 function createTaskCard(task, index, isArchived) {
     const card = document.createElement("div");
 
-    // Warna berdasarkan bobot.
     let priorityClass = "priority-low";
 
     if (Number(task.weight) >= 70) {
@@ -591,11 +443,10 @@ function createTaskCard(task, index, isArchived) {
     }
 
     card.className =
-        `task-card ${priorityClass} ${
-            isArchived ? "archived" : ""
-        }`;
+        "task-card " +
+        priorityClass +
+        (isArchived ? " archived" : "");
 
-    // Periksa deadline.
     const overdue = isOverdue(task.deadline);
 
     const overdueWarning =
@@ -603,10 +454,38 @@ function createTaskCard(task, index, isArchived) {
             ? `<span class="overdue-warning">Melebihi Deadline</span>`
             : "";
 
-    // Amankan ID untuk digunakan dalam event handler.
-    const safeId = JSON.stringify(
-        String(task.id)
-    ).replace(/</g, "\\u003c");
+    const moveButtons = !isArchived
+        ? `
+            <div class="move-buttons">
+                <button type="button" data-action="move-up"
+                    data-id="${escapeHTML(task.id)}"
+                    aria-label="Pindahkan tugas ke atas">↑</button>
+
+                <button type="button" data-action="move-down"
+                    data-id="${escapeHTML(task.id)}"
+                    aria-label="Pindahkan tugas ke bawah">↓</button>
+            </div>
+        `
+        : "";
+
+    const actions = !isArchived
+        ? `
+            <button type="button" class="btn btn-secondary"
+                data-action="edit" data-id="${escapeHTML(task.id)}">
+                Edit
+            </button>
+
+            <button type="button" class="btn btn-archive"
+                data-action="archive" data-id="${escapeHTML(task.id)}">
+                Arsipkan
+            </button>
+        `
+        : `
+            <button type="button" class="btn btn-success"
+                data-action="unarchive" data-id="${escapeHTML(task.id)}">
+                Kembalikan
+            </button>
+        `;
 
     card.innerHTML = `
         <div class="task-top">
@@ -618,38 +497,14 @@ function createTaskCard(task, index, isArchived) {
 
                 ${
                     task.description
-                        ? `
-                            <div class="task-description">
-                                ${escapeHTML(task.description)}
-                            </div>
-                        `
+                        ? `<div class="task-description">
+                            ${escapeHTML(task.description)}
+                           </div>`
                         : ""
                 }
             </div>
 
-            ${
-                !isArchived
-                    ? `
-                        <div class="move-buttons">
-                            <button
-                                type="button"
-                                aria-label="Pindahkan tugas ke atas"
-                                onclick="moveTask(${safeId}, -1)"
-                            >
-                                ↑
-                            </button>
-
-                            <button
-                                type="button"
-                                aria-label="Pindahkan tugas ke bawah"
-                                onclick="moveTask(${safeId}, 1)"
-                            >
-                                ↓
-                            </button>
-                        </div>
-                    `
-                    : ""
-            }
+            ${moveButtons}
         </div>
 
         <div class="task-info">
@@ -665,51 +520,16 @@ function createTaskCard(task, index, isArchived) {
 
             ${
                 overdue && !isArchived
-                    ? `
-                        <span class="badge badge-overdue">
-                            Terlambat
-                        </span>
-                    `
+                    ? `<span class="badge badge-overdue">Terlambat</span>`
                     : ""
             }
         </div>
 
         <div class="task-actions">
-            ${
-                !isArchived
-                    ? `
-                        <button
-                            type="button"
-                            class="btn btn-secondary"
-                            onclick="editTask(${safeId})"
-                        >
-                            Edit
-                        </button>
+            ${actions}
 
-                        <button
-                            type="button"
-                            class="btn btn-archive"
-                            onclick="archiveTask(${safeId})"
-                        >
-                            Arsipkan
-                        </button>
-                    `
-                    : `
-                        <button
-                            type="button"
-                            class="btn btn-success"
-                            onclick="unarchiveTask(${safeId})"
-                        >
-                            Kembalikan
-                        </button>
-                    `
-            }
-
-            <button
-                type="button"
-                class="btn btn-danger"
-                onclick="deleteTask(${safeId})"
-            >
+            <button type="button" class="btn btn-danger"
+                data-action="delete" data-id="${escapeHTML(task.id)}">
                 Hapus
             </button>
         </div>
@@ -719,73 +539,126 @@ function createTaskCard(task, index, isArchived) {
 }
 
 
-// ============================================
-// ADD / EDIT TASK
-// ============================================
+/* =========================================
+   TAMBAH / EDIT TUGAS
+========================================= */
 
-taskForm.addEventListener("submit", function (event) {
+taskForm.addEventListener("submit", async event => {
     event.preventDefault();
+
+    if (isSaving) return;
+
+    if (!currentUser) {
+        alert("Silakan login terlebih dahulu.");
+        return;
+    }
 
     const nameValue = taskName.value.trim();
     const deadlineValue = deadline.value;
     const weightValue = Number(weight.value);
     const descriptionValue = description.value.trim();
 
-    if (!nameValue || !deadlineValue) return;
+    if (!nameValue || !deadlineValue) {
+        alert("Nama tugas dan deadline wajib diisi.");
+        return;
+    }
 
     if (
         !Number.isFinite(weightValue) ||
         weightValue < 1 ||
         weightValue > 100
     ) {
-        alert("Bobot harus berada di antara 1 sampai 100.");
+        alert("Bobot harus antara 1 sampai 100.");
         return;
     }
 
-    // Edit tugas yang sudah ada.
-    if (taskId.value) {
-        const task = tasks.find(
-            item => String(item.id) === String(taskId.value)
-        );
+    isSaving = true;
+    submitButton.disabled = true;
 
-        if (task) {
+    try {
+        let task;
+
+        if (taskId.value) {
+            task = tasks.find(
+                item => String(item.id) === String(taskId.value)
+            );
+
+            if (!task) {
+                throw new Error("Tugas yang ingin diedit tidak ditemukan.");
+            }
+
             task.name = nameValue;
             task.deadline = deadlineValue;
             task.weight = weightValue;
             task.description = descriptionValue;
-        }
-    } else {
-        // Tambah tugas baru.
-        const newTask = {
-            id: Date.now().toString(),
-
-            manualOrder: tasks.reduce(
-                (max, task) =>
-                    Math.max(
-                        max,
-                        Number(task.manualOrder) || 0
-                    ),
+        } else {
+            const maxOrder = tasks.reduce(
+                (max, item) => Math.max(
+                    max,
+                    Number(item.manualOrder) || 0
+                ),
                 -1
-            ) + 1,
+            );
 
-            name: nameValue,
-            deadline: deadlineValue,
-            weight: weightValue,
-            description: descriptionValue,
-            archived: false
-        };
+            task = {
+                id: crypto.randomUUID
+                    ? crypto.randomUUID()
+                    : Date.now().toString(),
+                name: nameValue,
+                deadline: deadlineValue,
+                weight: weightValue,
+                description: descriptionValue,
+                archived: false,
+                manualOrder: maxOrder + 1
+            };
 
-        tasks.push(newTask);
+            tasks.push(task);
+        }
+
+        await saveTaskToCloud(task);
+
+        resetForm();
+        renderTasks();
+    } catch (error) {
+        console.error("Gagal menyimpan tugas:", error);
+
+        alert(
+            "Tugas gagal disimpan ke Supabase: " +
+            error.message
+        );
+
+        // Muat ulang data server agar tampilan kembali konsisten.
+        try {
+            await loadTasks();
+            renderTasks();
+        } catch (reloadError) {
+            console.error("Gagal memuat ulang tugas:", reloadError);
+        }
+    } finally {
+        isSaving = false;
+        submitButton.disabled = false;
     }
+});
 
-    saveTasks();
-    renderTasks();
-    resetForm();
+
+/* =========================================
+   RESET FORM
+========================================= */
+
+function resetForm() {
+    taskForm.reset();
+    taskId.value = "";
+    weight.value = 50;
+
+    formTitle.textContent = "Tambah Tugas";
+    submitButton.textContent = "Tambah Tugas";
+    cancelEdit.classList.add("hidden");
 }
 
-// ============================================
-// EDIT TASK
-// ============================================
+
+/* =========================================
+   EDIT TUGAS
+========================================= */
 
 function editTask(id) {
     const task = tasks.find(
@@ -800,198 +673,180 @@ function editTask(id) {
     weight.value = task.weight;
     description.value = task.description || "";
 
+    formTitle.textContent = "Edit Tugas";
     submitButton.textContent = "Simpan Perubahan";
-
     cancelEdit.classList.remove("hidden");
 
-    document.getElementById("formTitle").textContent =
-        "Edit Tugas";
-
-    window.scrollTo({
-        top: 0,
-        behavior: "smooth"
+    taskForm.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
     });
 }
 
-// ============================================
-// CANCEL EDIT
-// ============================================
 
 cancelEdit.addEventListener("click", resetForm);
 
-function resetForm() {
-    taskForm.reset();
 
-    taskId.value = "";
-    weight.value = 50;
+/* =========================================
+   AKSI KARTU TUGAS
+========================================= */
 
-    submitButton.textContent = "Tambah Tugas";
-
-    cancelEdit.classList.add("hidden");
-
-    document.getElementById("formTitle").textContent =
-        "Tambah Tugas";
-}
-
-// ============================================
-// DELETE TASK
-// ============================================
-
-function deleteTask(id) {
-    const confirmed = confirm(
-        "Apakah Anda yakin ingin menghapus tugas ini?"
-    );
-
-    if (!confirmed) return;
-
-    tasks = tasks.filter(
-        task => String(task.id) !== String(id)
-    );
-
-    saveTasks();
-    renderTasks();
-}
-
-// ============================================
-// ARCHIVE TASK
-// ============================================
-
-function archiveTask(id) {
+async function handleTaskAction(action, id) {
     const task = tasks.find(
         item => String(item.id) === String(id)
     );
 
     if (!task) return;
 
-    task.archived = true;
+    try {
+        if (action === "edit") {
+            editTask(id);
+            return;
+        }
 
-    saveTasks();
-    renderTasks();
-}
+        if (action === "delete") {
+            const confirmed = confirm(
+                `Hapus tugas "${task.name}"?`
+            );
 
-// ============================================
-// UNARCHIVE TASK
-// ============================================
+            if (!confirmed) return;
 
-function unarchiveTask(id) {
-    const task = tasks.find(
-        item => String(item.id) === String(id)
-    );
+            await deleteTaskFromCloud(id);
 
-    if (!task) return;
+            tasks = tasks.filter(
+                item => String(item.id) !== String(id)
+            );
 
-    task.archived = false;
+            renderTasks();
+            return;
+        }
 
-    saveTasks();
-    renderTasks();
-}
+        if (action === "archive") {
+            task.archived = true;
+            await saveTaskToCloud(task);
+            renderTasks();
+            return;
+        }
 
-// ============================================
-// MOVE TASK / MANUAL ORDER
-// ============================================
+        if (action === "unarchive") {
+            task.archived = false;
+            await saveTaskToCloud(task);
+            renderTasks();
+            return;
+        }
 
-function moveTask(id, direction) {
-    const activeTasksArray = tasks
-        .filter(task => !task.archived)
-        .sort(
-            (a, b) =>
-                Number(a.manualOrder) -
-                Number(b.manualOrder)
+        if (action === "move-up" || action === "move-down") {
+            const active = tasks
+                .filter(item => !item.archived)
+                .sort((a, b) =>
+                    Number(a.manualOrder) - Number(b.manualOrder)
+                );
+
+            const currentIndex = active.findIndex(
+                item => String(item.id) === String(id)
+            );
+
+            const direction = action === "move-up" ? -1 : 1;
+            const newIndex = currentIndex + direction;
+
+            if (newIndex < 0 || newIndex >= active.length) {
+                return;
+            }
+
+            const currentTask = active[currentIndex];
+            const targetTask = active[newIndex];
+
+            const temp = currentTask.manualOrder;
+            currentTask.manualOrder = targetTask.manualOrder;
+            targetTask.manualOrder = temp;
+
+            currentSort = "manual";
+            sortSelect.value = "manual";
+
+            await saveAllPositions();
+            renderTasks();
+        }
+    } catch (error) {
+        console.error("Aksi tugas gagal:", error);
+
+        alert(
+            "Perubahan gagal disimpan: " + error.message
         );
 
-    const currentIndex = activeTasksArray.findIndex(
-        task => String(task.id) === String(id)
-    );
-
-    const newIndex = currentIndex + direction;
-
-    if (
-        currentIndex < 0 ||
-        newIndex < 0 ||
-        newIndex >= activeTasksArray.length
-    ) {
-        return;
+        try {
+            await loadTasks();
+            renderTasks();
+        } catch (reloadError) {
+            console.error("Gagal memuat ulang tugas:", reloadError);
+        }
     }
-
-    const currentTask = activeTasksArray[currentIndex];
-    const targetTask = activeTasksArray[newIndex];
-
-    // Tukar urutan kedua tugas.
-    const tempOrder = currentTask.manualOrder;
-
-    currentTask.manualOrder = targetTask.manualOrder;
-    targetTask.manualOrder = tempOrder;
-
-    // Kembali ke mode manual.
-    currentSort = "manual";
-    sortSelect.value = "manual";
-
-    saveTasks();
-    renderTasks();
 }
 
-// ============================================
-// SORT
-// ============================================
 
-sortSelect.addEventListener("change", function () {
+taskList.addEventListener("click", event => {
+    const button = event.target.closest("button[data-action]");
+
+    if (!button) return;
+
+    handleTaskAction(
+        button.dataset.action,
+        button.dataset.id
+    );
+});
+
+
+archiveList.addEventListener("click", event => {
+    const button = event.target.closest("button[data-action]");
+
+    if (!button) return;
+
+    handleTaskAction(
+        button.dataset.action,
+        button.dataset.id
+    );
+});
+
+
+/* =========================================
+   PENGURUTAN
+========================================= */
+
+sortSelect.addEventListener("change", () => {
     currentSort = sortSelect.value;
     renderTasks();
 });
 
-// ============================================
-// FORMAT DATE
-// ============================================
 
-function formatDate(dateString) {
-    if (!dateString) return "-";
+/* =========================================
+   INISIALISASI SESI
+========================================= */
 
-    const date = new Date(
-        dateString + "T00:00:00"
-    );
+supabaseClient.auth.onAuthStateChange(
+    (_event, session) => {
+        // Jalankan di luar callback autentikasi untuk menghindari
+        // konflik ketika melakukan permintaan Supabase berikutnya.
+        queueMicrotask(() => {
+            handleSession(session);
+        });
+    }
+);
 
-    if (Number.isNaN(date.getTime())) return "-";
 
-    return date.toLocaleDateString("id-ID", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric"
-    });
-}
+// Periksa sesi yang sudah ada saat halaman dibuka.
+(async function initializeAuth() {
+    try {
+        const { data, error } =
+            await supabaseClient.auth.getSession();
 
-// ============================================
-// CHECK OVERDUE
-// ============================================
+        if (error) throw error;
 
-function isOverdue(dateString) {
-    if (!dateString) return false;
+        await handleSession(data.session);
+    } catch (error) {
+        console.error("Gagal memeriksa sesi:", error);
 
-    const today = new Date();
+        authStatus.textContent =
+            "Tidak dapat memeriksa sesi. Muat ulang halaman atau periksa konfigurasi Supabase.";
 
-    today.setHours(0, 0, 0, 0);
-
-    const deadlineDate = new Date(
-        dateString + "T00:00:00"
-    );
-
-    return (
-        !Number.isNaN(deadlineDate.getTime()) &&
-        deadlineDate < today
-    );
-}
-
-// ============================================
-// SECURITY: ESCAPE HTML
-// ============================================
-
-function escapeHTML(value) {
-    const div = document.createElement("div");
-
-    div.textContent =
-        value == null ? "" : String(value);
-
-    return div.innerHTML;
-}
-
-// Daftar tugas dirender setelah sesi login dan data cloud dimuat.
-// Saat logout, aplikasi disembunyikan dan data lokal tetap dipertahankan.
+        googleLoginButton.disabled = false;
+    }
+})();
