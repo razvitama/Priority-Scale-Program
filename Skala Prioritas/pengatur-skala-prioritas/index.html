@@ -54,211 +54,214 @@
         #authStatus {
             margin-top: 12px;
             font-size: .92rem;
+            overflow-wrap: anywhere;
         }
 
         #userEmail {
             font-size: .92rem;
             overflow-wrap: anywhere;
         }
+
+        .overdue-warning {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            background: #fee2e2;
+            color: #b91c1c;
+            font-size: .8rem;
+            font-weight: 700;
+        }
+
+        button:disabled {
+            opacity: .6;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 
 <body>
+    <header class="header">
+        <div>
+            <h1>Skala Prioritas</h1>
+            <p>Pengatur tugas mahasiswa</p>
+        </div>
 
-<header class="header">
-    <div>
-        <h1>Skala Prioritas</h1>
-        <p>Pengatur tugas mahasiswa</p>
-    </div>
+        <div class="auth-controls">
+            <span id="userEmail"></span>
 
-    <div class="auth-controls">
-        <span id="userEmail"></span>
+            <button
+                type="button"
+                id="logoutButton"
+                class="auth-button"
+                hidden
+            >
+                Keluar
+            </button>
+        </div>
+    </header>
+
+    <!-- LOGIN -->
+    <section id="loginSection">
+        <h2>Masuk ke Skala Prioritas</h2>
+
+        <p>
+            Login dengan Google untuk menyimpan dan membuka
+            daftar tugas dari perangkat lain.
+        </p>
 
         <button
             type="button"
-            id="logoutButton"
+            id="googleLoginButton"
             class="auth-button"
-            hidden
         >
-            Keluar
+            Lanjutkan dengan Google
         </button>
+
+        <p id="authStatus" role="status" aria-live="polite">
+            Memeriksa sesi login...
+        </p>
+    </section>
+
+    <!-- APLIKASI -->
+    <div id="appContent" hidden>
+        <main class="container">
+
+            <!-- Statistik -->
+            <section class="stats">
+                <div class="stat-card">
+                    <span class="stat-number" id="totalTasks">0</span>
+                    <span>Total Tugas</span>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-number" id="activeTasks">0</span>
+                    <span>Tugas Aktif</span>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-number" id="archivedTasks">0</span>
+                    <span>Arsip</span>
+                </div>
+            </section>
+
+            <!-- Form tambah/edit tugas -->
+            <section class="task-form-section">
+                <h2 id="formTitle">Tambah Tugas</h2>
+
+                <form id="taskForm">
+                    <input type="hidden" id="taskId">
+
+                    <div class="form-group">
+                        <label for="taskName">Nama Tugas</label>
+
+                        <input
+                            type="text"
+                            id="taskName"
+                            placeholder="Contoh: Laporan Praktikum"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="deadline">Deadline</label>
+
+                            <input
+                                type="date"
+                                id="deadline"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="weight">Bobot</label>
+
+                            <input
+                                type="number"
+                                id="weight"
+                                min="1"
+                                max="100"
+                                value="50"
+                                required
+                            >
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="description">Keterangan</label>
+
+                        <textarea
+                            id="description"
+                            rows="3"
+                            placeholder="Keterangan tugas (opsional)"
+                        ></textarea>
+                    </div>
+
+                    <div class="form-buttons">
+                        <button
+                            type="submit"
+                            class="btn btn-primary"
+                            id="submitButton"
+                        >
+                            Tambah Tugas
+                        </button>
+
+                        <button
+                            type="button"
+                            class="btn btn-secondary hidden"
+                            id="cancelEdit"
+                        >
+                            Batal
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Tugas aktif -->
+            <section class="task-section">
+                <div class="section-header">
+                    <h2>Tugas Aktif</h2>
+
+                    <div class="sort-control">
+                        <label for="sortSelect">Urutkan:</label>
+
+                        <select id="sortSelect" class="sort-select">
+                            <option value="manual">Manual</option>
+                            <option value="deadline-asc">Deadline Terdekat</option>
+                            <option value="deadline-desc">Deadline Terjauh</option>
+                            <option value="weight-desc">Bobot Tertinggi</option>
+                            <option value="weight-asc">Bobot Terendah</option>
+                            <option value="priority">Prioritas (Bobot + Deadline)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="taskList" class="task-list"></div>
+
+                <div id="emptyMessage" class="empty-message">
+                    Belum ada tugas.
+                </div>
+            </section>
+
+            <!-- Arsip -->
+            <section class="task-section archive-section">
+                <div class="section-header">
+                    <h2>Arsip Tugas</h2>
+                </div>
+
+                <div id="archiveList" class="task-list"></div>
+
+                <div id="emptyArchive" class="empty-message">
+                    Belum ada tugas yang diarsipkan.
+                </div>
+            </section>
+
+        </main>
     </div>
-</header>
 
-<section id="loginSection">
-    <h2>Masuk ke Skala Prioritas</h2>
-
-    <p>
-        Login dengan Google untuk menyimpan dan membuka
-        daftar tugas dari perangkat lain.
-    </p>
-
-    <button
-        type="button"
-        id="googleLoginButton"
-        class="auth-button"
-    >
-        Lanjutkan dengan Google
-    </button>
-
-    <p id="authStatus" role="status" aria-live="polite">
-        Memeriksa sesi login...
-    </p>
-</section>
-
-<div id="appContent" hidden>
-    <main class="container">
-
-        <!-- Statistik -->
-        <section class="stats">
-
-            <div class="stat-card">
-                <span class="stat-number" id="totalTasks">0</span>
-                <span>Total Tugas</span>
-            </div>
-
-            <div class="stat-card">
-                <span class="stat-number" id="activeTasks">0</span>
-                <span>Tugas Aktif</span>
-            </div>
-
-            <div class="stat-card">
-                <span class="stat-number" id="archivedTasks">0</span>
-                <span>Arsip</span>
-            </div>
-
-        </section>
-
-        <!-- Form tambah / edit -->
-        <section class="task-form-section">
-
-            <h2 id="formTitle">Tambah Tugas</h2>
-
-            <form id="taskForm">
-                <input type="hidden" id="taskId">
-
-                <div class="form-group">
-                    <label for="taskName">Nama Tugas</label>
-
-                    <input
-                        type="text"
-                        id="taskName"
-                        placeholder="Contoh: Laporan Praktikum"
-                        required
-                    >
-                </div>
-
-                <div class="form-row">
-
-                    <div class="form-group">
-                        <label for="deadline">Deadline</label>
-
-                        <input
-                            type="date"
-                            id="deadline"
-                            required
-                        >
-                    </div>
-
-                    <div class="form-group">
-                        <label for="weight">Bobot</label>
-
-                        <input
-                            type="number"
-                            id="weight"
-                            min="1"
-                            max="100"
-                            value="50"
-                            required
-                        >
-                    </div>
-
-                </div>
-
-                <div class="form-group">
-                    <label for="description">Keterangan</label>
-
-                    <textarea
-                        id="description"
-                        rows="3"
-                        placeholder="Keterangan tugas (opsional)"
-                    ></textarea>
-                </div>
-
-                <div class="form-buttons">
-
-                    <button
-                        type="submit"
-                        class="btn btn-primary"
-                        id="submitButton"
-                    >
-                        Tambah Tugas
-                    </button>
-
-                    <button
-                        type="button"
-                        class="btn btn-secondary hidden"
-                        id="cancelEdit"
-                    >
-                        Batal
-                    </button>
-
-                </div>
-            </form>
-
-        </section>
-
-        <!-- Daftar tugas -->
-        <section class="task-section">
-
-            <div class="section-header">
-                <h2>Tugas Aktif</h2>
-
-                <div class="sort-control">
-                    <label for="sortSelect">Urutkan:</label>
-
-                    <select id="sortSelect" class="sort-select">
-                        <option value="manual">Manual</option>
-                        <option value="deadline-asc">Deadline Terdekat</option>
-                        <option value="deadline-desc">Deadline Terjauh</option>
-                        <option value="weight-desc">Bobot Tertinggi</option>
-                        <option value="weight-asc">Bobot Terendah</option>
-                        <option value="priority">
-                            Prioritas (Bobot + Deadline)
-                        </option>
-                    </select>
-                </div>
-            </div>
-
-            <div id="taskList" class="task-list"></div>
-
-            <div id="emptyMessage" class="empty-message">
-                Belum ada tugas.
-            </div>
-
-        </section>
-
-        <!-- Arsip -->
-        <section class="task-section archive-section">
-
-            <div class="section-header">
-                <h2>Arsip Tugas</h2>
-            </div>
-
-            <div id="archiveList" class="task-list"></div>
-
-            <div id="emptyArchive" class="empty-message">
-                Belum ada tugas yang diarsipkan.
-            </div>
-
-        </section>
-
-    </main>
-</div>
-
-<!-- Library harus dimuat sebelum script.js -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="./script.js"></script>
-
+    <!-- Library Supabase harus dimuat sebelum script.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./script.js"></script>
 </body>
 </html>
