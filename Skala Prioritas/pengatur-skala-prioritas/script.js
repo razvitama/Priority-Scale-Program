@@ -1,10 +1,11 @@
 
 // ============================================
-// PRIORITY SCALE & SUPABASE GOOGLE LOGIN
+// SKALA PRIORITAS TUGAS + SUPABASE GOOGLE LOGIN
 // ============================================
 
-const SUPABASE_URL = https://yuxgbmpzekxiccrqgbut.supabase.co;
-const SUPABASE_ANON_KEY = sb_publishable_-oT3Vbkt41nBu5C5t2bHjg_Pso62yUs;
+// Ganti dengan URL dan publishable/anon key Supabase.
+const SUPABASE_URL = "MASUKKAN_URL_PROJECT_SUPABASE";
+const SUPABASE_ANON_KEY = "MASUKKAN_PUBLISHABLE_ATAU_ANON_KEY_SUPABASE";
 
 const STORAGE_KEY = "skalaPrioritasTasks";
 
@@ -71,7 +72,7 @@ let authStateUserId = null;
 let syncQueue = Promise.resolve();
 
 // ============================================
-// HTML ELEMENT
+// ELEMENT HTML
 // ============================================
 
 const loginSection = document.getElementById("loginSection");
@@ -103,7 +104,7 @@ const cancelEdit = document.getElementById("cancelEdit");
 const sortSelect = document.getElementById("sortSelect");
 
 // ============================================
-// LOGIN / CLOUD STATUS
+// STATUS LOGIN / CLOUD
 // ============================================
 
 function setAuthStatus(message, isError = false) {
@@ -244,7 +245,7 @@ async function handleAuthSession(session) {
 }
 
 // ============================================
-// LOGIN INITIALIZATION
+// INISIALISASI LOGIN
 // ============================================
 
 if (supabaseClient) {
@@ -349,6 +350,7 @@ if (logoutButton) {
         }
     );
 }
+
 
 // ============================================
 // LOCAL STORAGE + SUPABASE SYNC
@@ -715,6 +717,7 @@ function createTaskCard(task, index, isArchived) {
 
     return card;
 }
+
 
 // ============================================
 // ADD / EDIT TASK
