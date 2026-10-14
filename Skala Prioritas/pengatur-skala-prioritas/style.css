@@ -420,18 +420,90 @@ textarea:focus {
 
 }
 
+/* GOOGLE LOGIN DAN AKUN */
 
-/* OVERDUE WARNING */
+.account-bar {
+    margin-top: 12px;
+}
 
+#userInfo {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
 
-.overdue-warning {
-    display: inline-block;
-    margin-left: 8px;
-    padding: 3px 7px;
-    border-radius: 6px;
-    background: #fee2e2;
-    color: #b91c1c;
-    font-size: 11px;
+#userInfo.hidden {
+    display: none !important;
+}
+
+#userAvatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: white;
+}
+
+#userEmail {
+    overflow-wrap: anywhere;
+    font-size: 14px;
+}
+
+.login-section {
+    max-width: 440px;
+    margin: 35px auto;
+    padding: 28px 20px;
+    background: white;
+    border-radius: 14px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.login-section h2 {
+    margin-bottom: 10px;
+}
+
+.login-section p {
+    color: #6b7280;
+    margin-bottom: 20px;
+}
+
+.google-login-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: white;
+    color: #1f2937;
+    font-size: 15px;
     font-weight: bold;
-    vertical-align: middle;
+    cursor: pointer;
+}
+
+.google-login-button:hover {
+    background: #f9fafb;
+}
+
+.google-login-button img {
+    width: 20px;
+    height: 20px;
+}
+
+#authMessage {
+    margin-top: 16px;
+    overflow-wrap: anywhere;
+}
+
+#authMessage:empty {
+    display: none;
+}
+
+#googleLoginButton:disabled {
+    opacity: 0.6;
+    cursor: wait;
 }
